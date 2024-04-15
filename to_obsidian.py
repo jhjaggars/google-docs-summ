@@ -49,7 +49,7 @@ def parse_doc(doc):
 
 def summarize(ctx):
     prompt_template = f"""
-    Produce a summary of the supplied context.  The summary should be at least 2 sentences long.  Try to include the names of people mentioned in the context.
+    Produce a summary of the supplied context.  The summary should be at least 2 sentences long.  The summary should be no more than 4 sentences long.  Try to include the names of people mentioned in the context.
 
     Context: {ctx}
     """
@@ -66,60 +66,70 @@ def encode(ch):
 def slug(term):
     return "".join(encode(ch) for ch in term)
 
-parser = argparse.ArgumentParser()
-parser.add_argument('document', help='the document id to convert')
-parser.add_argument('-d', '--directory', help='directory to put output files', default="/home/jhjaggars/Documents/ObsidianVault/docs")
-args = parser.parse_args()
-document_id = args.document.split()[0] # list formats doc id \t name
 
-docs_service = get_docs_service()
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument('documents', nargs='+', help='the document id to convert')
+    parser.add_argument('-d', '--directory', help='directory to put output files', default="/home/jhjaggars/Documents/ObsidianVault/docs")
+    args = parser.parse_args()
 
-sys.stdout.write(f"fetching google doc {document_id}")
-sys.stdout.flush()
-start = time.time()
-# Use the Google Docs API to get the document content
-doc = docs_service.documents().get(documentId=document_id).execute()
-
-elapsed = time.time() - start
-sys.stdout.write(f" {elapsed} elapsed\n")
-sys.stdout.flush()
-
-doc_title, context, rev = parse_doc(doc)
-
-# see if the revisionId has changed since the last run
-full_path = None
-should_summarize = True
-if args.directory:
-    full_path = os.path.join(args.directory, "%s.md" % slug(doc_title))
-    with open(full_path) as fp:
-        for line in fp:
-            if line.strip().startswith("revisionId:"):
-                revision_id = line.split(":")[1]
-                print(f"{revision_id.strip()} == {rev}?")
-                should_summarize = revision_id.strip() != rev
+    docs_service = get_docs_service()
 
 
-if should_summarize:
-    sys.stdout.write(f"summarizing '{doc_title}' ({len(context)} chars)")
-    sys.stdout.flush()
-    start = time.time()
-    summary = summarize(context)
-    elapsed= time.time() - start
+    for document_id in args.documents:
+        try:
+            sys.stdout.write(f"fetching google doc {document_id}")
+            sys.stdout.flush()
+            start = time.time()
 
-    sys.stdout.write(f" {elapsed} elapsed\n")
-    sys.stdout.flush()
+            doc = docs_service.documents().get(documentId=document_id).execute()
 
-    final_output = f"""
----
-documentTitle: {doc_title}
-documentId: {document_id}
-revisionId: {rev}
----
-{summary}
-""".strip()
+            elapsed = time.time() - start
+            sys.stdout.write(f" {elapsed} elapsed\n")
+            sys.stdout.flush()
+        except Exception:
+            continue
 
-    if full_path:
-        with open(full_path, 'w') as fp:
-            fp.write(final_output)
-    else:
-        print(final_output)
+        doc_title, context, rev = parse_doc(doc)
+
+        # see if the revisionId has changed since the last run
+        full_path = None
+        should_summarize = True
+        if args.directory:
+            full_path = os.path.join(args.directory, "%s.md" % slug(doc_title))
+            try:
+                with open(full_path) as fp:
+                    for line in fp:
+                        if line.strip().startswith("revisionId:"):
+                            revision_id = line.split(":")[1]
+                            print(f"{revision_id.strip()} == {rev}?")
+                            should_summarize = revision_id.strip() != rev
+            except FileNotFoundError:
+                pass
+
+        if should_summarize:
+            sys.stdout.write(f"summarizing '{doc_title}' ({len(context)} chars)")
+            sys.stdout.flush()
+            start = time.time()
+            summary = summarize(context)
+            elapsed= time.time() - start
+
+            sys.stdout.write(f" {elapsed} elapsed\n")
+            sys.stdout.flush()
+
+            final_output = "\n".join((
+                '---',
+                f"documentId: {document_id}",
+                f"revisionId: {rev}",
+                f"url: https://docs.google.com/document/d/{document_id}",
+                "aliases:",
+                f"  - {document_id}",
+                "---",
+                f"{summary}"
+            ))
+
+            if full_path:
+                with open(full_path, 'w') as fp:
+                    fp.write(final_output)
+            else:
+                print(final_output)
