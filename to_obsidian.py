@@ -69,6 +69,7 @@ if __name__ == "__main__":
         # see if the revisionId has changed since the last run
         full_path = None
         should_summarize = True
+
         if args.directory:
             full_path = os.path.join(args.directory, "%s.md" % slug(doc_title))
             try:
@@ -77,7 +78,11 @@ if __name__ == "__main__":
                         if line.strip().startswith("revisionId:"):
                             revision_id = line.split(":")[1]
                             print(f"{revision_id.strip()} == {rev}?")
-                            should_summarize = revision_id.strip() != rev
+                            # if we've summarized the document in the past and
+                            # it does not have a revision id then we can't
+                            # really know if it has changed this way, so don't
+                            # bother summarizing again
+                            should_summarize = rev is not None and revision_id.strip() != rev
             except FileNotFoundError:
                 pass
 
