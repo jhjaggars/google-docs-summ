@@ -2,6 +2,9 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
+import googleapiclient
+import google_auth_httplib2
+import httplib2
 import os
 
 def get_credentials():
@@ -29,6 +32,10 @@ def get_docs_service(creds=None):
     if creds is None:
         creds = get_credentials()
 
+    def build_request(http, *args, **kwargs):
+        new_http = google_auth_httplib2.AuthorizedHttp(creds, http=httplib2.Http())
+        return googleapiclient.http.HttpRequest(new_http, *args, **kwargs)
+
     # Step 2: Build the service objects
-    docs_service = build('docs', 'v1', credentials=creds)
+    docs_service = build('docs', 'v1', requestBuilder=build_request, http=httplib2.Http())
     return docs_service
