@@ -25,7 +25,9 @@ def parse_doc(doc):
 
 def summarize(ctx):
     prompt_template = f"""
-    Produce a summary of the supplied context.  The summary should be at least 2 sentences long.  The summary should be no more than 4 sentences long.  Try to include the names of people mentioned in the context.
+    Produce a summary of the supplied context.  The summary should be at least
+    2 sentences long.  The summary should be no more than 4 sentences long.
+    Try to include the names of people mentioned in the context.
 
     Context: {ctx}
     """
